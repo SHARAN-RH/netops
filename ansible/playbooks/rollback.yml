@@ -1,0 +1,6 @@
+---
+- hosts: "{{ router_id }}"
+  gather_facts: no
+  tasks:
+    - name: Rollback placeholder
+      debug: msg="Rolling back {{ inventory_hostname }}"

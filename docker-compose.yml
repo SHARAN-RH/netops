@@ -1,0 +1,58 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_DB: ${PG_DB:-netops}
+    ports: ["5432:5432"]
+    volumes:
+      - ./servers/mcp_postgres/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  influx:
+    image: influxdb:2.7
+    ports: ["8086:8086"]
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PASS:-admin123}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-netops}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET:-telemetry}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN:-dev-token}
+    volumes:
+      - influx-data:/var/lib/influxdb2
+
+  mcp_postgres:
+    build: ./servers/mcp_postgres
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: ${PG_DB:-netops}
+      PG_USER: ${PG_USER:-postgres}
+      PG_PASSWORD: ${PG_PASSWORD:-postgres}
+      SERVER_PORT: 7001
+    depends_on: [postgres]
+    ports: ["7001:7001"]
+
+  mcp_influx:
+    build: ./servers/mcp_influx
+    environment:
+      INFLUX_URL: http://influx:8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-dev-token}
+      INFLUX_ORG: ${INFLUX_ORG:-netops}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-telemetry}
+      SERVER_PORT: 7002
+    depends_on: [influx]
+    ports: ["7002:7002"]
+
+  mcp_ansible:
+    build: ./servers/mcp_ansible
+    environment:
+      SERVER_PORT: 7003
+    volumes:
+      - ./ansible:/workspace/ansible:ro
+    ports: ["7003:7003"]
+
+volumes:
+  influx-data:

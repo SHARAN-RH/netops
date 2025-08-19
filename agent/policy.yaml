@@ -1,0 +1,13 @@
+defaults:
+  window: "2h"            # telemetry lookback
+  max_cpu_percent: 70
+  min_free_mem_percent: 30
+  max_critical_errors: 0
+  require_maintenance_window: false
+
+llm_gate:
+  enabled: true
+  model: "gpt-4o-mini"   # or your preferred compact model
+  prompt_notes: |
+    Consider firmware compatibility, recent error spikes, and if device is within allowed window.
+    If unsure, deny.

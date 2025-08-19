@@ -1,0 +1,9 @@
+---
+- hosts: "{{ router_id }}"
+  gather_facts: no
+  vars:
+    target_ver: "{{ target_ver }}"
+  tasks:
+    - name: Show precheck
+      debug: msg="Upgrading {{ inventory_hostname }} to {{ target_ver }}"
+    # Add real network_cli/netconf/httpapi tasks per vendor here
