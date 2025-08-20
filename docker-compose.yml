@@ -1,0 +1,203 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for storing router info, policies, and audit logs
+  postgres:
+    image: postgres:15-alpine
+    container_name: netops-postgres
+    environment:
+      POSTGRES_DB: ${PG_DB:-netops}
+      POSTGRES_USER: ${PG_USER:-postgres}  
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./servers/mcp_postgres/sql/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./sample_data_rich.sql:/docker-entrypoint-initdb.d/02_sample_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-postgres} -d ${PG_DB:-netops}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - netops
+
+  # InfluxDB for telemetry and time-series data
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: netops-influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PASSWORD:-password}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-netops}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET:-telemetry}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN:-netops-token-123}
+    ports:
+      - "${INFLUX_PORT:-8086}:8086"
+    volumes:
+      - influx_data:/var/lib/influxdb2
+      - influx_config:/etc/influxdb2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - netops
+
+  # Redis for caching and session management  
+  redis:
+    image: redis:7-alpine
+    container_name: netops-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - netops
+
+  # Grafana for monitoring and visualization
+  grafana:
+    image: grafana/grafana-oss:10.2.0
+    container_name: netops-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - influxdb
+    networks:
+      - netops
+
+  # Telegram Bot Interface
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.interfaces
+    container_name: netops-telegram
+    environment:
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      MCP_POSTGRES: http://postgres:5432
+      MCP_INFLUX: http://influxdb:8086
+      MCP_ANSIBLE: http://ansible-server:8080
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    networks:
+      - netops
+    restart: unless-stopped
+
+  # Web UI Interface  
+  web-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.interfaces
+    container_name: netops-webui
+    environment:
+      STREAMLIT_SERVER_PORT: 8501
+      STREAMLIT_SERVER_ADDRESS: 0.0.0.0
+      MCP_POSTGRES: http://postgres:5432
+      MCP_INFLUX: http://influxdb:8086
+      MCP_ANSIBLE: http://ansible-server:8080
+    ports:
+      - "${WEBUI_PORT:-8501}:8501"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    networks:
+      - netops
+    restart: unless-stopped
+
+  # Data seeding service (runs once)
+  data-seeder:
+    build:
+      context: .
+      dockerfile: Dockerfile.seeder
+    container_name: netops-seeder
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: ${PG_DB:-netops}
+      PG_USER: ${PG_USER:-postgres}
+      PG_PASSWORD: ${PG_PASSWORD:-postgres}
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-netops-token-123}
+      INFLUX_ORG: ${INFLUX_ORG:-netops}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-telemetry}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    networks:
+      - netops
+    restart: "no"
+
+  # MCP Agent Runner (for scheduled operations)
+  mcp-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    container_name: netops-mcp-agent
+    environment:
+      NODE_ENV: production
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: ${PG_DB:-netops}
+      PG_USER: ${PG_USER:-postgres}
+      PG_PASSWORD: ${PG_PASSWORD:-postgres}
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-netops-token-123}
+      INFLUX_ORG: ${INFLUX_ORG:-netops}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-telemetry}
+    volumes:
+      - ./ansible:/app/ansible:ro
+      - ~/.ssh:/root/.ssh:ro  # SSH keys for device access
+      - agent_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    networks:
+      - netops
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  influx_data:
+    driver: local
+  influx_config:
+    driver: local
+  redis_data:
+    driver: local
+  grafana_data:
+    driver: local
+  agent_logs:
+    driver: local
+
+networks:
+  netops:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

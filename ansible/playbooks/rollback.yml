@@ -1,0 +1,86 @@
+# ansible/playbooks/rollback.yml
+---
+- hosts: "{{ router_id }}"
+  gather_facts: yes
+  vars:
+    backup_dir: "/tmp/network_backups/{{ inventory_hostname }}"
+    
+  tasks:
+    - name: Find latest config backup
+      find:
+        paths: "{{ backup_dir }}"
+        patterns: "*.cfg"
+        age: -1d
+      delegate_to: localhost
+      register: backup_files
+
+    - name: Identify most recent backup
+      set_fact:
+        latest_backup: "{{ (backup_files.files | sort(attribute='mtime') | last).path }}"
+      when: backup_files.matched > 0
+
+    - name: Restore previous boot configuration
+      cisco.ios.ios_config:
+        src: "{{ latest_backup }}"
+        save_when: always
+      when: 
+        - latest_backup is defined
+        - ansible_network_os == 'ios'
+      notify: reboot_device
+
+    - name: Reload device to previous version
+      cisco.ios.ios_command:
+        commands:
+          - reload in 1
+      when: not ansible_check_mode
+      
+  handlers:
+    - name: reboot_device
+      wait_for_connection:
+        delay: 60
+        timeout: 600
+
+---
+# ansible/playbooks/ping.yml
+- hosts: "{{ router_id }}"
+  gather_facts: no
+  tasks:
+    - name: Test connectivity
+      wait_for_connection:
+        timeout: 30
+
+    - name: Ping test
+      cisco.ios.ios_ping:
+        dest: 8.8.8.8
+        count: 3
+      when: ansible_network_os == 'ios'
+
+---
+# ansible/playbooks/gather_facts.yml
+- hosts: "{{ router_id }}"
+  gather_facts: yes
+  tasks:
+    - name: Gather comprehensive device facts
+      cisco.ios.ios_facts:
+        gather_subset: all
+      when: ansible_network_os == 'ios'
+
+    - name: Get additional system info
+      cisco.ios.ios_command:
+        commands:
+          - show version
+          - show memory summary
+          - show processes cpu
+          - show flash:
+          - show interfaces status
+      register: system_info
+      when: ansible_network_os == 'ios'
+
+    - name: Display gathered information
+      debug:
+        var: ansible_facts
+      
+    - name: Display system information
+      debug:
+        var: system_info
+      when: system_info is defined

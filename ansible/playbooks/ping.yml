@@ -1,0 +1,13 @@
+---
+# Simple connectivity validation playbook
+# Targets the host specified via extra var: -e router_id=<HOST>
+- name: Validate connectivity to network device
+  hosts: "{{ router_id }}"
+  gather_facts: false
+  tasks:
+    - name: Ping device
+      ansible.builtin.ping:
+
+    - name: Output simple JSON line for parser
+      ansible.builtin.debug:
+        msg: "{\"router_id\": \"{{ router_id }}\", \"connectivity\": \"ok\"}"

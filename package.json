@@ -1,0 +1,32 @@
+{
+    "name": "mcp-network-upgrader",
+    "version": "1.0.0",
+    "description": "MCP-based Network Upgrade Agent",
+    "type": "module",
+    "scripts": {
+      "build": "tsc",
+      "start:postgres": "node dist/servers/mcp-postgres/server.js",
+      "start:influx": "node dist/servers/mcp-influx/server.js",
+      "start:ansible": "node dist/servers/mcp-ansible/server.js",
+      "start:agent": "node dist/agent/mcp-agent.js",
+      "dev:postgres": "tsx src/servers/mcp-postgres/server.ts",
+      "dev:influx": "tsx src/servers/mcp-influx/server.ts",
+      "dev:ansible": "tsx src/servers/mcp-ansible/server.ts",
+      "dev:agent": "tsx src/agent/mcp-agent.ts"
+    },
+    "dependencies": {
+      "@modelcontextprotocol/sdk": "^0.5.0",
+      "@anthropic-ai/sdk": "^0.27.0",
+      "pg": "^8.11.3",
+      "@influxdata/influxdb-client": "^1.33.2",
+      "yaml": "^2.3.4",
+      "dotenv": "^16.3.1",
+      "zod": "^3.22.4"
+    },
+    "devDependencies": {
+      "@types/node": "^20.10.0",
+      "@types/pg": "^8.10.9",
+      "typescript": "^5.3.0",
+      "tsx": "^4.6.0"
+    }
+  }

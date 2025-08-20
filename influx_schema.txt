@@ -1,0 +1,863 @@
+# InfluxDB Schema for MCP Network Upgrade Agent
+# Version: 2.0 (InfluxDB 2.x Line Protocol Format)
+# Description: Comprehensive time-series schema for network device telemetry and monitoring
+
+# ================================
+# BUCKET CONFIGURATION
+# ================================
+
+# Primary buckets with retention policies
+buckets:
+  telemetry:
+    retention: 90d  # 3 months of detailed metrics
+    description: "Real-time device telemetry and performance metrics"
+    
+  alerts:
+    retention: 365d  # 1 year of alert history
+    description: "Alert events and threshold violations"
+    
+  upgrades:
+    retention: 2y  # 2 years of upgrade telemetry
+    description: "Upgrade process metrics and validation data"
+    
+  audit:
+    retention: 5y  # 5 years of audit metrics
+    description: "Security and compliance audit metrics"
+    
+  synthetic:
+    retention: 30d  # 1 month of synthetic test data
+    description: "Synthetic monitoring and connectivity tests"
+
+# ================================
+# MEASUREMENT SCHEMAS
+# ================================
+
+# CPU Performance Metrics
+measurements:
+  cpu:
+    description: "CPU utilization and performance metrics"
+    tags:
+      router_id: "Device identifier (R1, SW001, etc.)"
+      hostname: "Device hostname"
+      vendor: "Device vendor (cisco, juniper, arista)"
+      model: "Device model"
+      site: "Physical site location"
+      organization: "Organization/tenant ID"
+      cpu_core: "Specific CPU core (for multi-core devices)"
+      process_name: "Process name (for per-process metrics)"
+    fields:
+      usage_percent: "float - CPU usage percentage (0-100)"
+      idle_percent: "float - CPU idle percentage (0-100)"
+      system_percent: "float - System CPU usage (0-100)"
+      user_percent: "float - User CPU usage (0-100)"
+      iowait_percent: "float - I/O wait percentage (0-100)"
+      load_1min: "float - 1-minute load average"
+      load_5min: "float - 5-minute load average"
+      load_15min: "float - 15-minute load average"
+      processes_total: "integer - Total number of processes"
+      processes_running: "integer - Number of running processes"
+      context_switches_per_sec: "integer - Context switches per second"
+      interrupts_per_sec: "integer - Interrupts per second"
+    example: |
+      cpu,router_id=R1,hostname=core-01,vendor=cisco,model=ISR4321,site=datacenter1 usage_percent=45.2,idle_percent=54.8,load_1min=0.8 1640995200000000000
+
+  # Memory Metrics  
+  memory:
+    description: "Memory utilization and allocation metrics"
+    tags:
+      router_id: "Device identifier"
+      hostname: "Device hostname" 
+      vendor: "Device vendor"
+      model: "Device model"
+      site: "Physical site location"
+      organization: "Organization/tenant ID"
+      memory_type: "Type of memory (main, buffer, cache, swap)"
+      memory_pool: "Memory pool name (for devices with multiple pools)"
+    fields:
+      total_bytes: "integer - Total memory in bytes"
+      used_bytes: "integer - Used memory in bytes"
+      free_bytes: "integer - Free memory in bytes" 
+      available_bytes: "integer - Available memory in bytes"
+      usage_percent: "float - Memory usage percentage (0-100)"
+      free_percent: "float - Free memory percentage (0-100)"
+      buffer_bytes: "integer - Buffer memory in bytes"
+      cache_bytes: "integer - Cache memory in bytes"
+      swap_total_bytes: "integer - Total swap memory in bytes"
+      swap_used_bytes: "integer - Used swap memory in bytes"
+      swap_free_bytes: "integer - Free swap memory in bytes"
+      largest_free_block_bytes: "integer - Largest contiguous free block"
+      fragmentation_percent: "float - Memory fragmentation percentage"
+    example: |
+      memory,router_id=R1,hostname=core-01,vendor=cisco,model=ISR4321 total_bytes=8589934592i,used_bytes=3221225472i,free_bytes=5368709120i,usage_percent=37.5,free_percent=62.5 1640995200000000000
+
+  # Storage/Disk Metrics
+  storage:
+    description: "Storage utilization and I/O metrics"
+    tags:
+      router_id: "Device identifier"
+      hostname: "Device hostname"
+      vendor: "Device vendor"
+      model: "Device model"
+      site: "Physical site location"
+      organization: "Organization/tenant ID"
+      filesystem: "Filesystem name (bootflash, harddisk, etc.)"
+      mount_point: "Mount point path"
+      storage_type: "Storage type (flash, disk, nvram)"
+    fields:
+      total_bytes: "integer - Total storage capacity in bytes"
+      used_bytes: "integer - Used storage in bytes"
+      available_bytes: "integer - Available storage in bytes"
+      usage_percent: "float - Storage usage percentage (0-100)"
+      free_percent: "float - Free storage percentage (0-100)"
+      inodes_total: "integer - Total inodes"
+      inodes_used: "integer - Used inodes"
+      inodes_free: "integer - Free inodes"
+      read_ops_per_sec: "float - Read operations per second"
+      write_ops_per_sec: "float - Write operations per second"
+      read_bytes_per_sec: "float - Read throughput in bytes/sec"
+      write_bytes_per_sec: "float - Write throughput in bytes/sec"
+      avg_read_latency_ms: "float - Average read latency in milliseconds"
+      avg_write_latency_ms: "float - Average write latency in milliseconds"
+    example: |
+      storage,router_id=R1,filesystem=bootflash,storage_type=flash total_bytes=16777216000i,used_bytes=8388608000i,usage_percent=50.0,read_ops_per_sec=12.5 1640995200000000000
+
+  # Network Interface Metrics
+  interfaces:
+    description: "Network interface statistics and performance"
+    tags:
+      router_id: "Device identifier"
+      hostname: "Device hostname"
+      vendor: "Device vendor"
+      model: "Device model"
+      site: "Physical site location"
+      organization: "Organization/tenant ID"
+      interface_name: "Interface name (GigabitEthernet0/0/1, etc.)"
+      interface_type: "Interface type (ethernet, serial, loopback)"
+      interface_speed: "Interface speed (1G, 10G, 100G)"
+      vlan_id: "VLAN ID (if applicable)"
+      port_channel: "Port channel ID (if member)"
+    fields:
+      admin_status: "integer - Admin status (1=up, 0=down)"
+      oper_status: "integer - Operational status (1=up, 0=down)"
+      speed_bps: "integer - Interface speed in bits per second"
+      mtu_bytes: "integer - Maximum transmission unit"
+      rx_bytes: "integer - Received bytes (counter)"
+      tx_bytes: "integer - Transmitted bytes (counter)"
+      rx_packets: "integer - Received packets (counter)"
+      tx_packets: "integer - Transmitted packets (counter)"
+      rx_errors: "integer - Receive errors (counter)"
+      tx_errors: "integer - Transmit errors (counter)"
+      rx_drops: "integer - Received packets dropped (counter)"
+      tx_drops: "integer - Transmitted packets dropped (counter)"
+      collisions: "integer - Collision count (counter)"
+      rx_utilization_percent: "float - Receive utilization percentage"
+      tx_utilization_percent: "float - Transmit utilization percentage"
+      rx_pps: "float - Receive packets per second"
+      tx_pps: "float - Transmit packets per second"
+      rx_bps: "float - Receive bits per second"
+      tx_bps: "float - Transmit bits per second"
+      input_queue_size: "integer - Input queue current size"
+      output_queue_size: "integer - Output queue current size"
+      crc_errors: "integer - CRC error count"
+      frame_errors: "integer - Frame error count"
+      runts: "integer - Runt packet count"
+      giants: "integer - Giant packet count"
+    example: |
+      interfaces,router_id=R1,interface_name=GigabitEthernet0/0/1,interface_type=ethernet,interface_speed=1G admin_status=1i,oper_status=1i,rx_bytes=1048576000i,tx_bytes=524288000i,rx_utilization_percent=15.2,tx_utilization_percent=8.7 1640995200000000000
+
+  # System Health and Environmental
+  system:
+    description: "System health, environmental, and hardware status"
+    tags:
+      router_id: "Device identifier"
+      hostname: "Device hostname"
+      vendor: "Device vendor"
+      model: "Device model"
+      site: "Physical site location"
+      organization: "Organization/tenant ID"
+      sensor_name: "Sensor identifier"
+      sensor_type: "Sensor type (temperature, fan, power)"
+      component: "Hardware component (cpu, psu, linecard)"
+    fields:
+      uptime_seconds: "integer - System uptime in seconds"
+      boot_time: "integer - Boot time (Unix timestamp)"
+      temperature_celsius: "float - Temperature in Celsius"
+      fan_speed_rpm: "integer - Fan speed in RPM"
+      fan_status: "integer - Fan status (1=ok, 0=failed)"
+      power_consumption_watts: "float - Power consumption in watts"
+      power_status: "integer - Power supply status (1=ok, 0=failed)"
+      voltage_volts: "float - Voltage level"
+      current_amperes: "float - Current draw in amperes"
+      cpu_temperature_celsius: "float - CPU temperature"
+      chassis_temperature_celsius: "float - Chassis temperature"
+      altitude_meters: "float - Altitude in meters (if available)"
+      humidity_percent: "float - Relative humidity percentage"
+    example: |
+      system,router_id=R1,sensor_type=temperature,component=cpu uptime_seconds=86400i,temperature_celsius=45.2,fan_speed_rpm=3000i,power_consumption_watts=125.5 1640995200000000000
+
+  # Routing Protocol Metrics
+  routing:
+    description: "Routing protocol statistics and convergence metrics"
+    tags:
+      router_id: "Device identifier"
+      hostname: "Device hostname"
+      vendor: "Device vendor"
+      model: "Device model"
+      site: "Physical site location"
+      organization: "Organization/tenant ID"
+      protocol: "Routing protocol (ospf, bgp, eigrp, isis, rip)"
+      process_id: "Protocol process ID"
+      area_id: "OSPF area ID"
+      as_number: "BGP AS number"
+      neighbor_ip: "Neighbor IP address"
+      vrf: "VRF name"
+    fields:
+      routes_total: "integer - Total number of routes"
+      routes_active: "integer - Number of active routes"
+      routes_learned: "integer - Number of learned routes"
+      neighbors_total: "integer - Total number of neighbors"
+      neighbors_up: "integer - Number of neighbors in up state"
+      neighbors_down: "integer - Number of neighbors in down state"
+      adjacencies_full: "integer - Number of full adjacencies"
+      lsa_count: "integer - Link State Advertisement count (OSPF)"
+      convergence_time_ms: "float - Last convergence time in milliseconds"
+      hello_packets_sent: "integer - Hello packets sent (counter)"
+      hello_packets_received: "integer - Hello packets received (counter)"
+      update_packets_sent: "integer - Update packets sent (counter)"
+      update_packets_received: "integer - Update packets received (counter)"
+      flap_count: "integer - Route flap count"
+      memory_usage_bytes: "integer - Protocol memory usage"
+    example: |
+      routing,router_id=R1,protocol=ospf,area_id=0.0.0.0 routes_total=1500i,neighbors_up=4i,neighbors_down=0i,convergence_time_ms=250.5,lsa_count=800i 1640995200000000000
+
+  # Error and Event Logging
+  errors:
+    description: "Error events, alerts, and log analysis"
+    tags:
+      router_id: "Device identifier"
+      hostname: "Device hostname"
+      vendor: "Device vendor"
+      model: "Device model"
+      site: "Physical site location"
+      organization: "Organization/tenant ID"
+      severity: "Log severity (emergency, alert, critical, error, warning, notice, info, debug)"
+      facility: "Log facility (kernel, system, security, etc.)"
+      component: "Component generating the error"
+      error_code: "Vendor-specific error code"
+      interface: "Interface name (if applicable)"
+    fields:
+      count: "integer - Error occurrence count"
+      rate_per_minute: "float - Error rate per minute"
+      total_since_boot: "integer - Total errors since boot"
+      last_occurrence: "integer - Last occurrence timestamp"
+      consecutive_count: "integer - Consecutive occurrence count"
+      burst_detected: "integer - Burst pattern detected (1=yes, 0=no)"
+      suppressed: "integer - Log suppression active (1=yes, 0=no)"
+    example: |
+      errors,router_id=R1,severity=critical,component=bgp,error_code=BGP-5-ADJCHANGE count=1i,rate_per_minute=0.0,total_since_boot=5i 1640995200000000000
+
+  # Security Metrics
+  security:
+    description: "Security events, authentication, and access control"
+    tags:
+      router_id: "Device identifier"
+      hostname: "Device hostname"
+      vendor: "Device vendor"
+      model: "Device model"
+      site: "Physical site location"
+      organization: "Organization/tenant ID"
+      event_type: "Security event type"
+      source_ip: "Source IP address"
+      user: "Username"
+      protocol: "Protocol used (ssh, telnet, snmp, http)"
+      interface: "Access interface"
+    fields:
+      login_attempts: "integer - Login attempt count"
+      login_failures: "integer - Failed login count"
+      login_successes: "integer - Successful login count"
+      active_sessions: "integer - Current active sessions"
+      failed_commands: "integer - Failed command attempts"
+      privilege_escalations: "integer - Privilege escalation attempts"
+      config_changes: "integer - Configuration changes made"
+      acl_denies: "integer - ACL deny hits"
+      acl_permits: "integer - ACL permit hits"
+      intrusion_attempts: "integer - Detected intrusion attempts"
+    example: |
+      security,router_id=R1,event_type=login,source_ip=192.168.1.100,user=admin,protocol=ssh login_attempts=1i,login_successes=1i,active_sessions=2i 1640995200000000000
+
+  # Quality of Service (QoS) Metrics  
+  qos:
+    description: "Quality of Service statistics and traffic classification"
+    tags:
+      router_id: "Device identifier"
+      hostname: "Device hostname"
+      vendor: "Device vendor"
+      model: "Device model"
+      site: "Physical site location"
+      organization: "Organization/tenant ID"
+      interface: "Interface name"
+      policy_name: "QoS policy name"
+      class_name: "Traffic class name"
+      direction: "Traffic direction (input, output)"
+    fields:
+      matched_packets: "integer - Packets matching class"
+      matched_bytes: "integer - Bytes matching class"
+      transmitted_packets: "integer - Transmitted packets"
+      transmitted_bytes: "integer - Transmitted bytes"
+      dropped_packets: "integer - Dropped packets"
+      dropped_bytes: "integer - Dropped bytes"
+      queue_depth: "integer - Current queue depth"
+      queue_max_depth: "integer - Maximum queue depth"
+      bandwidth_allocated_bps: "integer - Allocated bandwidth in bps"
+      bandwidth_used_bps: "integer - Used bandwidth in bps"
+      latency_ms: "float - Average latency in milliseconds"
+      jitter_ms: "float - Average jitter in milliseconds"
+      packet_loss_percent: "float - Packet loss percentage"
+    example: |
+      qos,router_id=R1,interface=GigabitEthernet0/0/1,class_name=voice,direction=output matched_packets=50000i,dropped_packets=10i,bandwidth_used_bps=64000i,latency_ms=12.5 1640995200000000000
+
+# ================================
+# UPGRADE-SPECIFIC MEASUREMENTS
+# ================================
+
+  # Upgrade Process Telemetry
+  upgrade_progress:
+    description: "Real-time upgrade process monitoring"
+    tags:
+      router_id: "Device identifier"
+      hostname: "Device hostname"
+      upgrade_id: "Upgrade session ID"
+      step_name: "Current upgrade step"
+      upgrade_type: "Type of upgrade (firmware, config, etc.)"
+      initiated_by: "Who/what initiated the upgrade"
+    fields:
+      progress_percent: "float - Overall progress percentage (0-100)"
+      step_progress_percent: "float - Current step progress (0-100)"
+      bytes_transferred: "integer - Bytes transferred so far"
+      total_bytes: "integer - Total bytes to transfer"
+      transfer_rate_bps: "float - Transfer rate in bits per second"
+      eta_seconds: "integer - Estimated time to completion"
+      steps_completed: "integer - Number of steps completed"
+      total_steps: "integer - Total number of steps"
+      current_phase: "string - Current upgrade phase"
+      rollback_available: "integer - Rollback available (1=yes, 0=no)"
+    example: |
+      upgrade_progress,router_id=R1,upgrade_id=uuid123,step_name=firmware_copy progress_percent=45.2,bytes_transferred=104857600i,transfer_rate_bps=1048576.0,eta_seconds=300i 1640995200000000000
+
+  # Pre/Post Upgrade Validation
+  upgrade_validation:
+    description: "Upgrade validation test results"
+    tags:
+      router_id: "Device identifier"
+      upgrade_id: "Upgrade session ID"
+      validation_type: "Type of validation (pre, post, rollback)"
+      test_name: "Specific validation test name"
+      test_category: "Test category (connectivity, performance, config)"
+    fields:
+      test_passed: "integer - Test passed (1=yes, 0=no)"
+      test_duration_ms: "integer - Test execution time in milliseconds"
+      expected_value: "float - Expected test value"
+      actual_value: "float - Actual measured value"
+      variance_percent: "float - Variance from expected (%)"
+      confidence_score: "float - Confidence score (0-1)"
+      retry_count: "integer - Number of test retries"
+      baseline_deviation: "float - Deviation from baseline"
+    example: |
+      upgrade_validation,router_id=R1,upgrade_id=uuid123,validation_type=post,test_name=interface_status test_passed=1i,test_duration_ms=500i,confidence_score=0.95 1640995200000000000
+
+# ================================
+# ALERT AND THRESHOLD DEFINITIONS
+# ================================
+
+# Threshold-based alerting rules
+thresholds:
+  cpu_usage:
+    warning: 70.0    # CPU usage > 70%
+    critical: 85.0   # CPU usage > 85%
+    duration: "5m"   # Sustained for 5 minutes
+    
+  memory_usage:
+    warning: 80.0    # Memory usage > 80%
+    critical: 90.0   # Memory usage > 90%
+    duration: "2m"
+    
+  memory_free:
+    warning: 20.0    # Free memory < 20%
+    critical: 10.0   # Free memory < 10%
+    duration: "2m"
+    
+  storage_usage:
+    warning: 85.0    # Storage > 85%
+    critical: 95.0   # Storage > 95%
+    duration: "1m"
+    
+  interface_utilization:
+    warning: 80.0    # Interface utilization > 80%
+    critical: 95.0   # Interface utilization > 95%
+    duration: "10m"
+    
+  interface_errors:
+    warning: 0.1     # Error rate > 0.1%
+    critical: 1.0    # Error rate > 1.0%
+    duration: "5m"
+    
+  temperature:
+    warning: 70.0    # Temperature > 70°C
+    critical: 85.0   # Temperature > 85°C
+    duration: "2m"
+    
+  critical_errors:
+    warning: 1       # Any critical errors
+    critical: 5      # 5 or more critical errors
+    duration: "1m"
+
+# ================================
+# RETENTION POLICIES
+# ================================
+
+retention_policies:
+  high_frequency:    # 10-second intervals
+    duration: "24h"  # Keep for 24 hours
+    measurements: ["interfaces", "cpu", "memory"]
+    
+  medium_frequency:  # 1-minute intervals  
+    duration: "7d"   # Keep for 7 days
+    measurements: ["system", "routing", "qos"]
+    
+  low_frequency:     # 5-minute intervals
+    duration: "90d"  # Keep for 90 days
+    measurements: ["storage", "errors", "security"]
+    
+  event_data:        # Event-driven
+    duration: "365d" # Keep for 1 year
+    measurements: ["upgrade_progress", "upgrade_validation"]
+
+# ================================
+# CONTINUOUS QUERIES (InfluxDB 1.x) / TASKS (InfluxDB 2.x)
+# ================================
+
+# Example Flux tasks for data aggregation and alerting
+tasks:
+  cpu_average_hourly:
+    description: "Calculate hourly CPU averages"
+    cron: "0 * * * *"  # Every hour
+    query: |
+      from(bucket: "telemetry")
+        |> range(start: -1h)
+        |> filter(fn: (r) => r._measurement == "cpu")
+        |> filter(fn: (r) => r._field == "usage_percent")
+        |> aggregateWindow(every: 1h, fn: mean)
+        |> to(bucket: "telemetry_hourly")
+        
+  interface_utilization_daily:
+    description: "Calculate daily interface utilization statistics"
+    cron: "0 0 * * *"  # Daily at midnight
+    query: |
+      from(bucket: "telemetry")
+        |> range(start: -1d)
+        |> filter(fn: (r) => r._measurement == "interfaces")
+        |> filter(fn: (r) => r._field == "rx_utilization_percent" or r._field == "tx_utilization_percent")
+        |> aggregateWindow(every: 1d, fn: mean)
+        |> to(bucket: "telemetry_daily")
+
+  critical_error_alerting:
+    description: "Monitor for critical errors and generate alerts"
+    cron: "* * * * *"  # Every minute
+    query: |
+      from(bucket: "telemetry")
+        |> range(start: -5m)
+        |> filter(fn: (r) => r._measurement == "errors")
+        |> filter(fn: (r) => r.severity == "critical")
+        |> filter(fn: (r) => r._field == "count")
+        |> aggregateWindow(every: 5m, fn: sum)
+        |> filter(fn: (r) => r._value > 0)
+        |> to(bucket: "alerts")
+
+# ================================
+# DATA COLLECTION EXAMPLES
+# ================================
+
+# Example data points showing the schema in action
+sample_data: |
+  # CPU metrics for multiple routers
+  cpu,router_id=R1,hostname=core-01,vendor=cisco,model=ISR4321,site=datacenter1,organization=acme usage_percent=45.2,idle_percent=54.8,load_1min=0.8,load_5min=0.6,load_15min=0.4 1640995200000000000
+  cpu,router_id=R2,hostname=edge-01,vendor=juniper,model=MX240,site=branch1,organization=acme usage_percent=62.1,idle_percent=37.9,load_1min=1.2,load_5min=1.0,load_15min=0.9 1640995200000000000
+  
+  # Memory metrics
+  memory,router_id=R1,hostname=core-01,vendor=cisco,model=ISR4321,site=datacenter1,organization=acme total_bytes=8589934592i,used_bytes=3221225472i,free_bytes=5368709120i,usage_percent=37.5,free_percent=62.5 1640995200000000000
+  
+  # Interface statistics
+  interfaces,router_id=R1,hostname=core-01,interface_name=GigabitEthernet0/0/1,interface_type=ethernet,interface_speed=1G,site=datacenter1,organization=acme admin_status=1i,oper_status=1i,rx_bytes=1048576000i,tx_bytes=524288000i,rx_utilization_percent=15.2,tx_utilization_percent=8.7,rx_errors=0i,tx_errors=0i 1640995200000000000
+  
+  # Critical error event
+  errors,router_id=R2,hostname=edge-01,severity=critical,component=bgp,error_code=BGP-5-ADJCHANGE,site=branch1,organization=acme count=1i,rate_per_minute=0.016,total_since_boot=3i,consecutive_count=1i 1640995200000000000
+  
+  # Upgrade progress tracking
+  upgrade_progress,router_id=R1,hostname=core-01,upgrade_id=550e8400-e29b-41d4-a716-446655440000,step_name=firmware_copy,upgrade_type=firmware,initiated_by=mcp-agent,organization=acme progress_percent=75.5,bytes_transferred=157286400i,total_bytes=209715200i,transfer_rate_bps=1048576.0,eta_seconds=50i,steps_completed=3i,total_steps=5i 1640995200000000000
+  
+  # Post-upgrade validation
+  upgrade_validation,router_id=R1,upgrade_id=550e8400-e29b-41d4-a716-446655440000,validation_type=post,test_name=version_check,test_category=config,organization=acme test_passed=1i,test_duration_ms=250i,confidence_score=1.0,retry_count=0i 1640995200000000000
+
+# ================================
+# FLUX QUERY EXAMPLES
+# ================================
+
+example_queries:
+  avg_cpu_last_2h: |
+    from(bucket: "telemetry")
+      |> range(start: -2h)
+      |> filter(fn: (r) => r._measurement == "cpu")
+      |> filter(fn: (r) => r._field == "usage_percent")
+      |> filter(fn: (r) => r.router_id == "R1")
+      |> mean()
+      
+  min_memory_last_2h: |
+    from(bucket: "telemetry")
+      |> range(start: -2h)
+      |> filter(fn: (r) => r._measurement == "memory")
+      |> filter(fn: (r) => r._field == "free_percent")
+      |> filter(fn: (r) => r.router_id == "R1")
+      |> min()
+      
+  critical_errors_last_2h: |
+    from(bucket: "telemetry")
+      |> range(start: -2h)
+      |> filter(fn: (r) => r._measurement == "errors")
+      |> filter(fn: (r) => r.severity == "critical")
+      |> filter(fn: (r) => r._field == "count")
+      |> filter(fn: (r) => r.router_id == "R1")
+      |> sum()
+      
+  interface_utilization_trend: |
+    from(bucket: "telemetry")
+      |> range(start: -24h)
+      |> filter(fn: (r) => r._measurement == "interfaces")
+      |> filter(fn: (r) => r._field == "rx_utilization_percent" or r._field == "tx_utilization_percent")
+      |> filter(fn: (r) => r.router_id == "R1")
+      |> aggregateWindow(every: 5m, fn: mean)
+      
+  upgrade_success_rate: |
+    from(bucket: "upgrades")
+      |> range(start: -30d)
+      |> filter(fn: (r) => r._measurement == "upgrade_validation")
+      |> filter(fn: (r) => r.validation_type == "post")
+      |> filter(fn: (r) => r._field == "test_passed")
+      |> group(columns: ["router_id"])
+      |> mean()
+      
+  device_health_summary: |
+    cpu_data = from(bucket: "telemetry")
+      |> range(start: -1h)
+      |> filter(fn: (r) => r._measurement == "cpu" and r._field == "usage_percent")
+      |> mean()
+      |> set(key: "metric", value: "cpu")
+      
+    mem_data = from(bucket: "telemetry")
+      |> range(start: -1h)
+      |> filter(fn: (r) => r._measurement == "memory" and r._field == "free_percent")
+      |> mean()
+      |> set(key: "metric", value: "memory")
+      
+    error_data = from(bucket: "telemetry")
+      |> range(start: -1h)
+      |> filter(fn: (r) => r._measurement == "errors" and r.severity == "critical" and r._field == "count")
+      |> sum()
+      |> set(key: "metric", value: "errors")
+      
+    union(tables: [cpu_data, mem_data, error_data])
+      |> group(columns: ["router_id"])
+      |> sort(columns: ["metric"])
+
+# ================================
+# ALERTING RULES
+# ================================
+
+# Example alerting configurations for common scenarios
+alerting_rules:
+  high_cpu_usage:
+    name: "High CPU Usage"
+    query: |
+      from(bucket: "telemetry")
+        |> range(start: -5m)
+        |> filter(fn: (r) => r._measurement == "cpu" and r._field == "usage_percent")
+        |> mean()
+        |> filter(fn: (r) => r._value > 85.0)
+    severity: "critical"
+    message: "CPU usage is above 85% on {{.router_id}}"
+    
+  low_memory:
+    name: "Low Available Memory"
+    query: |
+      from(bucket: "telemetry")
+        |> range(start: -2m)
+        |> filter(fn: (r) => r._measurement == "memory" and r._field == "free_percent")
+        |> mean()
+        |> filter(fn: (r) => r._value < 10.0)
+    severity: "critical"
+    message: "Available memory is below 10% on {{.router_id}}"
+    
+  critical_errors:
+    name: "Critical Errors Detected"
+    query: |
+      from(bucket: "telemetry")
+        |> range(start: -1m)
+        |> filter(fn: (r) => r._measurement == "errors" and r.severity == "critical" and r._field == "count")
+        |> sum()
+        |> filter(fn: (r) => r._value > 0)
+    severity: "warning"
+    message: "{{._value}} critical errors detected on {{.router_id}}"
+    
+  interface_down:
+    name: "Interface Down"
+    query: |
+      from(bucket: "telemetry")
+        |> range(start: -1m)
+        |> filter(fn: (r) => r._measurement == "interfaces" and r._field == "oper_status")
+        |> last()
+        |> filter(fn: (r) => r._value == 0)
+    severity: "warning"
+    message: "Interface {{.interface_name}} is down on {{.router_id}}"
+    
+  high_interface_errors:
+    name: "High Interface Error Rate"
+    query: |
+      from(bucket: "telemetry")
+        |> range(start: -10m)
+        |> filter(fn: (r) => r._measurement == "interfaces" and (r._field == "rx_errors" or r._field == "tx_errors"))
+        |> derivative(every: 1m, nonNegative: true)
+        |> sum()
+        |> filter(fn: (r) => r._value > 10)
+    severity: "warning"
+    message: "High error rate on interface {{.interface_name}} on {{.router_id}}"
+    
+  upgrade_failure:
+    name: "Upgrade Process Failed"
+    query: |
+      from(bucket: "upgrades")
+        |> range(start: -5m)
+        |> filter(fn: (r) => r._measurement == "upgrade_validation" and r.validation_type == "post" and r._field == "test_passed")
+        |> filter(fn: (r) => r._value == 0)
+    severity: "critical"
+    message: "Upgrade validation failed for {{.test_name}} on {{.router_id}}"
+    
+  temperature_high:
+    name: "High Temperature"
+    query: |
+      from(bucket: "telemetry")
+        |> range(start: -2m)
+        |> filter(fn: (r) => r._measurement == "system" and r._field == "temperature_celsius")
+        |> mean()
+        |> filter(fn: (r) => r._value > 75.0)
+    severity: "warning"
+    message: "Temperature is {{._value}}°C on {{.component}} of {{.router_id}}"
+
+# ================================
+# DATA INGESTION PATTERNS
+# ================================
+
+# Recommended data ingestion frequencies and batch sizes
+ingestion_patterns:
+  real_time_metrics:
+    frequency: "10s"
+    batch_size: 1000
+    measurements: ["cpu", "memory", "interfaces"]
+    collection_method: "SNMP polling, NETCONF streaming"
+    
+  system_metrics:
+    frequency: "1m"  
+    batch_size: 500
+    measurements: ["system", "storage", "routing"]
+    collection_method: "SNMP polling, CLI parsing"
+    
+  event_metrics:
+    frequency: "on_event"
+    batch_size: 100
+    measurements: ["errors", "security", "alerts"]
+    collection_method: "Syslog, SNMP traps, API webhooks"
+    
+  upgrade_metrics:
+    frequency: "5s"  # During upgrades only
+    batch_size: 50
+    measurements: ["upgrade_progress", "upgrade_validation"]
+    collection_method: "Direct agent reporting"
+
+# ================================
+# PERFORMANCE OPTIMIZATION
+# ================================
+
+# Index and optimization recommendations
+optimization:
+  tags_to_index:
+    - router_id
+    - hostname  
+    - organization
+    - site
+    - vendor
+    - severity (for errors)
+    - interface_name (for interfaces)
+    - upgrade_id (for upgrade metrics)
+    
+  cardinality_management:
+    high_cardinality_tags:
+      - source_ip (security measurements)
+      - error_code (error measurements)  
+      - process_name (cpu measurements)
+    recommendation: "Use fields instead of tags for high cardinality data"
+    
+  shard_duration:
+    telemetry: "1h"     # High frequency data
+    alerts: "24h"       # Medium frequency
+    upgrades: "7d"      # Low frequency, long retention
+    
+  compression:
+    algorithm: "snappy"
+    level: "default"
+    effectiveness: "60-80% reduction typical for network metrics"
+
+# ================================
+# BACKUP AND DISASTER RECOVERY
+# ================================
+
+backup_strategy:
+  incremental_backups:
+    frequency: "daily"
+    retention: "30d"
+    method: "InfluxDB backup utility"
+    
+  full_backups:
+    frequency: "weekly"
+    retention: "12w" 
+    method: "Full snapshot with metadata"
+    
+  cross_region_replication:
+    enabled: true
+    target_regions: ["us-west-2", "eu-west-1"]
+    lag_tolerance: "5m"
+
+# ================================
+# INTEGRATION EXAMPLES
+# ================================
+
+# Example integrations with external systems
+integrations:
+  grafana_dashboard_queries:
+    cpu_utilization_panel: |
+      from(bucket: "telemetry")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "cpu")
+        |> filter(fn: (r) => r._field == "usage_percent")
+        |> filter(fn: (r) => r.router_id =~ /^${router_id:regex}$/)
+        |> aggregateWindow(every: v.windowPeriod, fn: mean)
+        
+    memory_utilization_panel: |
+      from(bucket: "telemetry")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)  
+        |> filter(fn: (r) => r._measurement == "memory")
+        |> filter(fn: (r) => r._field == "usage_percent")
+        |> filter(fn: (r) => r.router_id =~ /^${router_id:regex}$/)
+        |> aggregateWindow(every: v.windowPeriod, fn: mean)
+        
+    interface_throughput_panel: |
+      rx_data = from(bucket: "telemetry")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "interfaces" and r._field == "rx_bps")
+        |> filter(fn: (r) => r.router_id =~ /^${router_id:regex}$/)
+        |> aggregateWindow(every: v.windowPeriod, fn: mean)
+        |> set(key: "direction", value: "rx")
+        
+      tx_data = from(bucket: "telemetry")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "interfaces" and r._field == "tx_bps")
+        |> filter(fn: (r) => r.router_id =~ /^${router_id:regex}$/)
+        |> aggregateWindow(every: v.windowPeriod, fn: mean)
+        |> set(key: "direction", value: "tx")
+        
+      union(tables: [rx_data, tx_data])
+
+  prometheus_federation:
+    cpu_metric: |
+      # HELP network_device_cpu_usage_percent CPU usage percentage
+      # TYPE network_device_cpu_usage_percent gauge
+      network_device_cpu_usage_percent{router_id="R1",hostname="core-01",vendor="cisco"} 45.2
+      
+    memory_metric: |
+      # HELP network_device_memory_free_percent Free memory percentage  
+      # TYPE network_device_memory_free_percent gauge
+      network_device_memory_free_percent{router_id="R1",hostname="core-01",vendor="cisco"} 62.5
+
+  api_endpoints:
+    health_check: |
+      GET /api/v1/health/R1
+      Response: {
+        "router_id": "R1",
+        "timestamp": "2024-01-01T12:00:00Z",
+        "cpu_avg": 45.2,
+        "memory_free": 62.5,
+        "critical_errors": 0,
+        "status": "healthy"
+      }
+      
+    metrics_export: |
+      GET /api/v1/metrics/R1?start=-2h&measurement=cpu,memory
+      Response: {
+        "router_id": "R1",
+        "timerange": {"start": "...", "end": "..."},
+        "metrics": [
+          {"measurement": "cpu", "field": "usage_percent", "values": [...]},
+          {"measurement": "memory", "field": "free_percent", "values": [...]}
+        ]
+      }
+
+# ================================
+# MIGRATION AND VERSIONING
+# ================================
+
+schema_versioning:
+  current_version: "2.0"
+  breaking_changes:
+    v1_to_v2:
+      - "Renamed 'mem' measurement to 'memory'"
+      - "Added 'organization' tag to all measurements"
+      - "Split 'errors' into 'errors' and 'security' measurements"
+      - "Changed timestamp precision from seconds to nanoseconds"
+      
+  migration_queries:
+    v1_to_v2_cpu: |
+      // Migrate v1 CPU data to v2 format
+      from(bucket: "telemetry_v1")
+        |> range(start: -30d)
+        |> filter(fn: (r) => r._measurement == "cpu")
+        |> map(fn: (r) => ({r with organization: "default"}))
+        |> to(bucket: "telemetry")
+        
+    v1_to_v2_memory: |
+      // Migrate v1 memory data (rename measurement)
+      from(bucket: "telemetry_v1")
+        |> range(start: -30d)
+        |> filter(fn: (r) => r._measurement == "mem")
+        |> map(fn: (r) => ({r with _measurement: "memory", organization: "default"}))
+        |> to(bucket: "telemetry")
+
+# ================================
+# DOCUMENTATION AND METADATA
+# ================================
+
+metadata:
+  schema_version: "2.0"
+  created_date: "2024-01-01"
+  last_updated: "2024-01-01"
+  maintainer: "Network Operations Team"
+  description: "Comprehensive time-series schema for network device monitoring and upgrade automation"
+  
+  measurement_count: 10
+  total_tags: 45
+  total_fields: 120
+  estimated_cardinality: "1M-10M series for 1000 devices"
+  
+  compatibility:
+    influxdb_versions: ["2.0+"]
+    flux_version: "0.194+"
+    grafana_versions: ["8.0+"]
+    
+  support_contact: "netops-team@company.com"
+  documentation_url: "https://docs.company.com/network-monitoring-schema"

@@ -1,0 +1,176 @@
+---
+- hosts: "{{ router_id }}"
+  gather_facts: yes
+  vars:
+    target_ver: "{{ target_ver }}"
+    backup_dir: "/tmp/network_backups/{{ inventory_hostname }}"
+    upgrade_timeout: 1800  # 30 minutes
+    
+  pre_tasks:
+    - name: Create backup directory
+      local_action:
+        module: file
+        path: "{{ backup_dir }}"
+        state: directory
+      run_once: true
+
+    - name: Validate target version format
+      assert:
+        that:
+          - target_ver is defined
+          - target_ver | length > 0
+        fail_msg: "Target version must be specified and non-empty"
+
+  tasks:
+    - name: Pre-upgrade connectivity test
+      wait_for_connection:
+        timeout: 30
+      tags: [pre_check, connectivity]
+
+    - name: Gather device facts
+      cisco.ios.ios_facts:
+        gather_subset: 
+          - hardware
+          - config
+          - interfaces
+      when: ansible_network_os == 'ios'
+      tags: [pre_check, facts]
+
+    - name: Check current firmware version
+      cisco.ios.ios_command:
+        commands:
+          - show version | include Software
+      register: current_version
+      when: ansible_network_os == 'ios'
+      tags: [pre_check, version]
+
+    - name: Verify available storage space
+      cisco.ios.ios_command:
+        commands:
+          - show flash: | include bytes
+      register: flash_space
+      when: ansible_network_os == 'ios'
+      tags: [pre_check, storage]
+
+    - name: Backup running configuration
+      cisco.ios.ios_config:
+        backup: yes
+        backup_options:
+          filename: "{{ inventory_hostname }}_{{ ansible_date_time.iso8601_basic_short }}.cfg"
+          dir_path: "{{ backup_dir }}"
+      when: ansible_network_os == 'ios'
+      tags: [backup]
+
+    - name: Copy firmware image (if needed)
+      cisco.ios.ios_command:
+        commands:
+          - copy {{ firmware_source | default('tftp://192.168.1.100/') }}{{ target_ver }}.bin bootflash:
+        wait_for:
+          - result[0] contains "copied"
+        timeout: "{{ upgrade_timeout }}"
+      when: 
+        - ansible_network_os == 'ios'
+        - not ansible_check_mode
+        - copy_firmware | default(false)
+      tags: [firmware_copy]
+
+    - name: Set boot image
+      cisco.ios.ios_config:
+        lines:
+          - "boot system flash:{{ target_ver }}.bin"
+        save_when: always
+      when: 
+        - ansible_network_os == 'ios'
+        - not ansible_check_mode
+      notify: reboot_device
+      tags: [boot_config]
+
+    - name: Verify boot configuration
+      cisco.ios.ios_command:
+        commands:
+          - show boot
+      register: boot_config
+      when: ansible_network_os == 'ios'
+      tags: [verify_boot]
+
+    - name: Display boot configuration
+      debug:
+        var: boot_config.stdout_lines
+      when: boot_config is defined
+      tags: [verify_boot]
+
+  handlers:
+    - name: reboot_device
+      cisco.ios.ios_command:
+        commands:
+          - reload in 1
+        wait_for:
+          - result[0] contains "Reload scheduled"
+      when: not ansible_check_mode
+      listen: reboot_device
+
+    - name: wait_for_device
+      wait_for_connection:
+        delay: 60
+        timeout: 900
+      listen: reboot_device
+
+  post_tasks:
+    - name: Wait for device to come back online
+      wait_for_connection:
+        delay: 60
+        timeout: 900
+      when: not ansible_check_mode
+      tags: [post_check]
+
+    - name: Post-upgrade version verification
+      cisco.ios.ios_command:
+        commands:
+          - show version | include Software
+      register: new_version
+      when: 
+        - ansible_network_os == 'ios'
+        - not ansible_check_mode
+      tags: [post_check, verify]
+
+    - name: Verify upgrade success
+      assert:
+        that:
+          - target_ver in new_version.stdout[0]
+        success_msg: "Upgrade successful - running {{ target_ver }}"
+        fail_msg: "Upgrade failed - version mismatch"
+      when: 
+        - new_version is defined
+        - not ansible_check_mode
+      tags: [post_check, verify]
+
+    - name: Post-upgrade interface status check
+      cisco.ios.ios_command:
+        commands:
+          - show ip interface brief
+      register: interface_status
+      when: 
+        - ansible_network_os == 'ios'
+        - not ansible_check_mode
+      tags: [post_check, interfaces]
+
+    - name: Check for any critical errors
+      cisco.ios.ios_command:
+        commands:
+          - show logging | include CRIT|ERROR
+      register: post_upgrade_logs
+      when: 
+        - ansible_network_os == 'ios'
+        - not ansible_check_mode
+      tags: [post_check, logs]
+
+    - name: Generate upgrade report
+      template:
+        src: upgrade_report.j2
+        dest: "{{ backup_dir }}/upgrade_report_{{ ansible_date_time.iso8601_basic_short }}.txt"
+      delegate_to: localhost
+      vars:
+        upgrade_status: "{{ 'SUCCESS' if (new_version is defined and target_ver in new_version.stdout[0]) else 'FAILED' }}"
+        pre_version: "{{ current_version.stdout[0] if current_version is defined else 'Unknown' }}"
+        post_version: "{{ new_version.stdout[0] if new_version is defined else 'Unknown' }}"
+      tags: [reporting]

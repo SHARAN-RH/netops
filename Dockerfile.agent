@@ -1,0 +1,89 @@
+# Dockerfile.agent - MCP Agent Runtime
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    openssh-client \
+    ansible \
+    curl
+
+# Copy package files
+COPY package*.json tsconfig.json ./
+
+# Install Node.js dependencies  
+RUN npm install
+
+# Copy source code
+COPY src/ ./src/
+
+# Build TypeScript
+RUN npm run build
+
+# Copy Ansible configuration
+COPY ansible/ ./ansible/
+
+# Create required directories
+RUN mkdir -p /app/logs /root/.ssh
+
+# Set proper permissions
+RUN chmod 700 /root/.ssh
+
+EXPOSE 8080
+
+CMD ["node", "dist/agent/mcp-agent.js"]
+
+---
+
+# Dockerfile.interfaces - Web UI and Telegram Bot
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache python3 py3-pip
+
+# Copy package files
+COPY package*.json tsconfig.json ./
+COPY interfaces/requirements.txt ./
+
+# Install dependencies
+RUN npm install && \
+    pip3 install -r requirements.txt
+
+# Copy source code
+COPY src/ ./src/
+COPY interfaces/ ./interfaces/
+
+# Build TypeScript
+RUN npm run build
+
+EXPOSE 8501
+
+CMD ["python3", "interfaces/web_ui.py"]
+
+---
+
+# Dockerfile.seeder - Data Seeding Service
+FROM python:3.11-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache postgresql-client
+
+# Copy requirements and install Python packages
+COPY requirements-seeder.txt ./
+RUN pip install --no-cache-dir -r requirements-seeder.txt
+
+# Copy seeding scripts and data
+COPY influx_seed_rich.py seed_postgres_rich.py ./
+COPY sample_data_rich.sql ./
+
+# Copy .env for configuration
+COPY .env ./
+
+CMD ["python", "seed_postgres_rich.py"]
