@@ -1,0 +1,103 @@
+# Network Upgrade Agent Policy Configuration
+defaults:
+  window: "2h"                     # Telemetry lookback window
+  max_cpu_percent: 70              # Maximum average CPU usage
+  min_free_mem_percent: 30         # Minimum free memory percentage
+  max_critical_errors: 0           # Maximum critical errors allowed
+  require_maintenance_window: false # Enforce maintenance windows
+
+# LLM-based decision gate configuration  
+llm_gate:
+  enabled: true
+  model: "claude-3-5-sonnet-20241022"  # Anthropic Claude model
+  temperature: 0.1                      # Low temperature for consistent decisions
+  max_tokens: 1024
+  prompt_guidelines: |
+    - Prioritize network stability and safety above all else
+    - Consider vendor-specific firmware compatibility requirements
+    - Evaluate recent error patterns and resource utilization trends
+    - Factor in maintenance windows and operational impact
+    - If data is incomplete or ambiguous, err on the side of caution
+    - Provide clear, actionable reasoning for decisions
+
+# Risk assessment thresholds
+risk_levels:
+  high_risk:
+    cpu_threshold: 85
+    memory_threshold: 20
+    error_threshold: 5
+  medium_risk:
+    cpu_threshold: 75
+    memory_threshold: 25
+    error_threshold: 2
+  low_risk:
+    cpu_threshold: 60
+    memory_threshold: 40
+    error_threshold: 0
+
+# Vendor-specific configurations
+vendor_policies:
+  cisco:
+    ios_xe:
+      compatibility_check: true
+      minimum_memory_mb: 4096
+      bootflash_requirement_mb: 2048
+    ios:
+      compatibility_check: true
+      minimum_memory_mb: 512
+      
+  juniper:
+    junos:
+      compatibility_check: true
+      minimum_storage_mb: 1024
+      
+  arista:
+    eos:
+      compatibility_check: true
+      minimum_storage_mb: 2048
+
+# Operational constraints
+constraints:
+  upgrade_window:
+    start_hour: 2      # 2 AM
+    end_hour: 6        # 6 AM
+    timezone: "UTC"
+    allowed_days: ["saturday", "sunday"]
+  
+  rollback_timeout: "30m"  # Auto-rollback if upgrade verification fails
+  max_concurrent_upgrades: 3
+  
+  # Pre-upgrade validation requirements
+  pre_checks:
+    - connectivity_test
+    - config_backup
+    - current_version_verify
+    - bootflash_space_check
+    
+  # Post-upgrade validation requirements  
+  post_checks:
+    - connectivity_test
+    - version_verify
+    - interface_status_check
+    - routing_table_verify
+
+# Alert and notification settings
+notifications:
+  enabled: true
+  channels:
+    - telegram
+    - email
+  
+  events:
+    - upgrade_approved
+    - upgrade_denied  
+    - upgrade_started
+    - upgrade_completed
+    - upgrade_failed
+    - rollback_triggered
+
+# Audit and compliance
+audit:
+  log_all_decisions: true
+  retain_logs_days: 90
+  compliance_mode: false  # Additional checks for regulated environments

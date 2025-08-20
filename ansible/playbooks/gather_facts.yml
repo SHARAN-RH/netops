@@ -1,0 +1,12 @@
+---
+- name: Gather device information
+  hosts: "{{ router_id }}"
+  gather_facts: true
+  tasks:
+    - name: Show selected facts
+      ansible.builtin.debug:
+        var: ansible_facts
+
+    - name: Output simple JSON line for parser
+      ansible.builtin.debug:
+        msg: '{"router_id": "{{ router_id }}", "facts_collected": true}'

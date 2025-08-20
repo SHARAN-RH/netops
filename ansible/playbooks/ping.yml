@@ -1,0 +1,11 @@
+---
+- name: Validate connectivity to network device
+  hosts: "{{ router_id }}"
+  gather_facts: false
+  tasks:
+    - name: Ping device
+      ansible.builtin.ping:
+
+    - name: Output simple JSON line for parser
+      ansible.builtin.debug:
+        msg: '{"router_id": "{{ router_id }}", "connectivity": "ok"}'

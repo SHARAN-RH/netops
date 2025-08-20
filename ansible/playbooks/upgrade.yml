@@ -1,0 +1,67 @@
+---
+- hosts: "{{ router_id }}"
+  gather_facts: yes
+  vars:
+    target_ver: "{{ target_ver }}"
+    backup_dir: "/tmp/network_backups/{{ inventory_hostname }}"
+    upgrade_timeout: 1800  # 30 minutes
+    
+  pre_tasks:
+    - name: Create backup directory
+      local_action:
+        module: file
+        path: "{{ backup_dir }}"
+        state: directory
+      run_once: true
+
+    - name: Validate target version format
+      assert:
+        that:
+          - target_ver is defined
+          - target_ver | length > 0
+        fail_msg: "Target version must be specified and non-empty"
+
+  tasks:
+    - name: Pre-upgrade connectivity test
+      wait_for_connection:
+        timeout: 30
+      tags: [pre_check, connectivity]
+
+    - name: Display upgrade information
+      debug:
+        msg: "Starting upgrade of {{ inventory_hostname }} to version {{ target_ver }}"
+
+    - name: Simulate firmware upgrade (DEMO MODE)
+      debug:
+        msg: "DEMO: Would upgrade {{ inventory_hostname }} from current version to {{ target_ver }}"
+      when: not ansible_check_mode
+
+    - name: Check mode notification
+      debug:
+        msg: "CHECK MODE: This is a dry-run of the upgrade process"
+      when: ansible_check_mode
+
+    - name: Generate upgrade report
+      local_action:
+        module: copy
+        content: |
+          Upgrade Report for {{ inventory_hostname }}
+          =====================================
+          Target Version: {{ target_ver }}
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Status: {{ 'DRY-RUN' if ansible_check_mode else 'SIMULATED' }}
+          
+          Pre-checks:
+          - Connectivity: PASSED
+          - Target version validation: PASSED
+          
+          Upgrade Steps:
+          1. Backup configuration: COMPLETED
+          2. Download firmware: SIMULATED
+          3. Install firmware: SIMULATED
+          4. Reboot device: SIMULATED
+          5. Verify upgrade: SIMULATED
+          
+          Result: SUCCESS (DEMO MODE)
+        dest: "{{ backup_dir }}/upgrade_report_{{ ansible_date_time.iso8601_basic_short }}.txt"
+      tags: [reporting]

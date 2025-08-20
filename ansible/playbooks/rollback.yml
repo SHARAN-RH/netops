@@ -1,0 +1,44 @@
+---
+- hosts: "{{ router_id }}"
+  gather_facts: yes
+  vars:
+    backup_dir: "/tmp/network_backups/{{ inventory_hostname }}"
+    
+  tasks:
+    - name: Pre-rollback connectivity test
+      wait_for_connection:
+        timeout: 30
+
+    - name: Display rollback information
+      debug:
+        msg: "Starting rollback of {{ inventory_hostname }} to previous version"
+
+    - name: Find latest config backup
+      find:
+        paths: "{{ backup_dir }}"
+        patterns: "*.txt"
+        age: -1d
+      delegate_to: localhost
+      register: backup_files
+
+    - name: Simulate rollback process (DEMO MODE)
+      debug:
+        msg: "DEMO: Would rollback {{ inventory_hostname }} to previous firmware version"
+
+    - name: Generate rollback report
+      local_action:
+        module: copy
+        content: |
+          Rollback Report for {{ inventory_hostname }}
+          ========================================
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Status: SIMULATED
+          
+          Rollback Steps:
+          1. Restore configuration: SIMULATED
+          2. Revert firmware: SIMULATED
+          3. Reboot device: SIMULATED
+          4. Verify rollback: SIMULATED
+          
+          Result: SUCCESS (DEMO MODE)
+        dest: "{{ backup_dir }}/rollback_report_{{ ansible_date_time.iso8601_basic_short }}.txt"
